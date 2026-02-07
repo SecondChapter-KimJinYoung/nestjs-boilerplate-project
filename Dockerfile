@@ -1,10 +1,8 @@
 FROM node:20-alpine AS builder
 RUN corepack enable && corepack prepare yarn@stable --activate
 WORKDIR /app
-COPY package.json yarn.lock .yarnrc.yml* ./
-RUN yarn install
 COPY . .
-RUN yarn build
+RUN yarn install && yarn build
 
 FROM node:20-alpine
 WORKDIR /app

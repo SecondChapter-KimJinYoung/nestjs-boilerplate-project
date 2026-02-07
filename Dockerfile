@@ -6,35 +6,49 @@ RUN corepack enable && corepack prepare yarn@stable --activate
 WORKDIR /app
 
 COPY package.json yarn.lock .yarnrc.yml* ./
-RUN yarn install --immutable || yarn install --frozen-lockfile
+RUN yarn install --immutable
 
 COPY . .
+
+ARG VITE_API_URL
+ENV VITE_API_URL=${VITE_API_URL}
+
 RUN yarn build
 
 # ─── 프로덕션 ────────────────────────────────────────
-FROM node:20-alpine
+FROM nginx:alpine
 
-RUN corepack enable && corepack prepare yarn@stable --activate
+RUN rm /etc/nginx/conf.d/default.conf
 
-WORKDIR /app
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-RUN addgroup -g 1001 -S nodejs && \
-    adduser -S appuser -u 1001
+RUN cat > /etc/nginx/conf.d/default.conf <<'EOF'
+server {
+    listen 3000;
+    root /usr/share/nginx/html;
+    index index.html;
 
-COPY package.json yarn.lock .yarnrc.yml* ./
-RUN yarn install --immutable --production || yarn install --frozen-lockfile --production && \
-    yarn cache clean
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript
+               application/json application/javascript application/xml+rss;
 
-COPY --from=builder --chown=appuser:nodejs /app/dist ./dist
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+        access_log off;
+    }
 
-USER appuser
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+}
+EOF
 
-ENV NODE_ENV=production
-ENV PORT=3001
+EXPOSE 3000
 
-EXPOSE 3001
+HEALTHCHECK --interval=30s --timeout=3s \
+  CMD wget -qO- http://localhost:3000/ || exit 1
 
-HEALTHCHECK --interval=30s --timeout=3s --start-period=15s \
-  CMD node -e "require('http').get('http://localhost:3001/health',(r)=>{process.exit(r.statusCode===200?0:1)})" || exit 1
-
-CMD ["node", "dist/main.js"]
+CMD ["nginx", "-g", "daemon off;"]

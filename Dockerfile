@@ -6,8 +6,7 @@ RUN corepack enable && corepack prepare yarn@stable --activate
 WORKDIR /app
 
 COPY package.json yarn.lock .yarnrc.yml* ./
-COPY .yarn ./.yarn 2>/dev/null || true
-RUN yarn install --immutable
+RUN yarn install --immutable || yarn install --frozen-lockfile
 
 COPY . .
 RUN yarn build
@@ -23,9 +22,7 @@ RUN addgroup -g 1001 -S nodejs && \
     adduser -S appuser -u 1001
 
 COPY package.json yarn.lock .yarnrc.yml* ./
-COPY .yarn ./.yarn 2>/dev/null || true
-RUN yarn plugin import workspace-tools 2>/dev/null || true && \
-    (yarn workspaces focus --production 2>/dev/null || yarn install --immutable) && \
+RUN yarn install --immutable --production || yarn install --frozen-lockfile --production && \
     yarn cache clean
 
 COPY --from=builder --chown=appuser:nodejs /app/dist ./dist

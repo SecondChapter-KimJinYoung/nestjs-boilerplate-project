@@ -1,0 +1,13 @@
+node_modules
+.git
+dist
+.yarn/cache
+.yarn/install-state.gz
+.env
+.env.*
+!.env.example
+.vscode
+.idea
+*.log
+coverage
+.DS_Store
